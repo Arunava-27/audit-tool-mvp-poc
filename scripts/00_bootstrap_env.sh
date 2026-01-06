@@ -14,21 +14,28 @@ if [[ -z "$INTERFACE" ]]; then
   exit 1
 fi
 
-# Detect IP address with CIDR
-CIDR=$(ip -o -f inet addr show "$INTERFACE" | awk '{print $4}' | head -n1)
+# Detect IP address (without CIDR)
+IP_ADDR=$(ip -o -f inet addr show "$INTERFACE" | awk '{print $4}' | cut -d/ -f1)
 
-if [[ -z "$CIDR" ]]; then
-  echo "[!] Failed to detect CIDR for interface $INTERFACE"
+if [[ -z "$IP_ADDR" ]]; then
+  echo "[!] Failed to detect IP address for interface $INTERFACE"
   exit 1
 fi
 
-NETWORK_RANGE="$CIDR"
+# Normalize to /24 network
+NETWORK_RANGE=$(echo "$IP_ADDR" | awk -F. '{printf "%s.%s.%s.0/24\n",$1,$2,$3}')
 
 # Build scan ID
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
+FINAL_PREFIX=""
+
 if [[ -n "$SCAN_PREFIX" ]]; then
-  SCAN_ID="${SCAN_PREFIX}_${TIMESTAMP}"
+  FINAL_PREFIX="$SCAN_PREFIX"
+fi
+
+if [[ -n "$FINAL_PREFIX" ]]; then
+  SCAN_ID="${FINAL_PREFIX}_${TIMESTAMP}"
 else
   SCAN_ID="$TIMESTAMP"
 fi
