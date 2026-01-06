@@ -1,0 +1,100 @@
+######################################
+# Audit Tool – Generated Artifacts
+######################################
+
+# Scan outputs (ALWAYS ignore)
+scans/
+phase1/scans/
+output/
+reports/
+logs/
+
+# Runtime-generated environment files
+.runtime.env
+.env.runtime
+
+# Temporary / intermediate scan files
+*.nmap
+*.xml
+*.json
+*.csv
+*.txt
+
+# Banner grab outputs
+banner_*.txt
+
+######################################
+# Databases (future phases)
+######################################
+
+# SQLite
+*.db
+*.sqlite
+*.sqlite3
+
+######################################
+# OS / Editor junk
+######################################
+
+# Linux
+*~
+.nfs*
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+######################################
+# IDE / Editor
+######################################
+
+.vscode/
+.idea/
+*.swp
+*.swo
+
+######################################
+# Logs
+######################################
+
+*.log
+
+######################################
+# Python (future FastAPI integration)
+######################################
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+######################################
+# Node (future UI)
+######################################
+
+node_modules/
+dist/
+build/
+
+######################################
+# Security-sensitive files
+######################################
+
+# Credentials, tokens, secrets
+*.key
+*.pem
+*.crt
+*.pfx
+secrets/
+credentials/
+
+######################################
+# Setup markers
+######################################
+
+.setup_done
