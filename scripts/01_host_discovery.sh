@@ -1,11 +1,20 @@
 #!/bin/bash
-
 set -e
 
+# -------------------------------
+# Load environment + helpers
+# -------------------------------
 source ../config.env
 source ../.runtime.env
+source ./_helpers.sh
+
+# Progress file for this scan
+PROGRESS_FILE="$OUTPUT_DIR/.progress/state"
 
 echo "[*] Starting host discovery on $NETWORK_RANGE"
+
+# Mark stage as running
+mark_running host_discovery
 
 # Ensure output directories exist
 mkdir -p "$OUTPUT_DIR/raw" "$OUTPUT_DIR/logs"
@@ -18,32 +27,25 @@ nmap -sn "$NETWORK_RANGE" \
 
 # -------------------------------
 # Extract IP addresses (mawk-safe)
-# Handles:
-#   - Nmap scan report for 192.168.1.10
-#   - Nmap scan report for hostname (192.168.1.10)
-#   - Nmap scan report for _gateway (192.168.1.1)
 # -------------------------------
 grep "Nmap scan report for" "$OUTPUT_DIR/raw/host_discovery_$SCAN_ID.nmap" \
 | awk '
 {
   line = $0
-
-  # Case 1: hostname (IP)
+  # hostname (IP)
   if (line ~ /\([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\)/) {
     gsub(/.*\(/, "", line)
     gsub(/\).*/, "", line)
     print line
   }
-  # Case 2: IP only
+  # IP only
   else {
     print $NF
   }
 }
 ' > "$OUTPUT_DIR/logs/live_hosts_$SCAN_ID.txt"
 
-# -------------------------------
-# Deduplicate host list
-# -------------------------------
+# Deduplicate
 sort -u "$OUTPUT_DIR/logs/live_hosts_$SCAN_ID.txt" \
   -o "$OUTPUT_DIR/logs/live_hosts_$SCAN_ID.txt"
 
@@ -57,5 +59,8 @@ if [[ "$HOST_COUNT" -eq 0 ]]; then
 else
   echo "[+] Discovered $HOST_COUNT live host(s)"
 fi
+
+# Mark stage as done
+mark_done host_discovery
 
 echo "[+] Host discovery completed"

@@ -1,14 +1,24 @@
 #!/bin/bash
-
 set -euo pipefail
 
 source ../config.env
 source ../.runtime.env
+source ./_helpers.sh
+
+# -------------------------------
+# Resume mode (safe default)
+# -------------------------------
+RESUME_MODE="${RESUME_MODE:-false}"
+
+PROGRESS_FILE="$OUTPUT_DIR/.progress/state"
 
 HOST_FILE="$OUTPUT_DIR/logs/live_hosts_$SCAN_ID.txt"
 RAW_DIR="$OUTPUT_DIR/raw"
 
 echo "[*] Starting port & service scan"
+
+# Mark stage as running
+mark_running port_scan
 
 # -------------------------------
 # Pre-flight checks
@@ -34,20 +44,22 @@ CURRENT=0
 while read -r host; do
   CURRENT=$((CURRENT + 1))
 
-  # Skip empty lines
   [[ -z "$host" ]] && continue
 
-  # Basic IP sanity check
   if ! [[ "$host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     echo "[!] Skipping invalid host entry: $host"
     continue
   fi
 
-  echo "[*] [$CURRENT/$TOTAL_HOSTS] Scanning $host"
-
   OUTPUT_PREFIX="$RAW_DIR/portscan_${host}_$SCAN_ID"
 
-  # Run scan with timeout protection
+  if [[ "$RESUME_MODE" == "true" && -f "${OUTPUT_PREFIX}.nmap" ]]; then
+    echo "[*] [$CURRENT/$TOTAL_HOSTS] Skipping $host (already scanned)"
+    continue
+  fi
+
+  echo "[*] [$CURRENT/$TOTAL_HOSTS] Scanning $host"
+
   if ! timeout 15m nmap \
       -sS \
       -sV \
@@ -64,5 +76,8 @@ while read -r host; do
   fi
 
 done < "$HOST_FILE"
+
+# Mark stage as done
+mark_done port_scan
 
 echo "[+] Port & service scanning completed"

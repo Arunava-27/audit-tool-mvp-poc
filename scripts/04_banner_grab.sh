@@ -1,15 +1,25 @@
 #!/bin/bash
-
 set -euo pipefail
 
 source ../config.env
 source ../.runtime.env
+source ./_helpers.sh
+
+# -------------------------------
+# Resume mode (safe default)
+# -------------------------------
+RESUME_MODE="${RESUME_MODE:-false}"
+
+PROGRESS_FILE="$OUTPUT_DIR/.progress/state"
 
 HOST_FILE="$OUTPUT_DIR/logs/live_hosts_$SCAN_ID.txt"
 RAW_DIR="$OUTPUT_DIR/raw"
 LOG_DIR="$OUTPUT_DIR/logs"
 
 echo "[*] Starting banner grabbing"
+
+# Mark stage as running
+mark_running banner_grab
 
 # -------------------------------
 # Pre-flight checks
@@ -37,7 +47,7 @@ while read -r host; do
 
   [[ -z "$host" ]] && continue
 
-  # Validate IPv4
+  # IPv4 sanity check
   if ! [[ "$host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     echo "[!] Skipping invalid host: $host"
     continue
@@ -50,7 +60,7 @@ while read -r host; do
     continue
   fi
 
-  # Extract open TCP ports (non-fatal if grep finds nothing)
+  # Extract open TCP ports (safe under pipefail)
   PORTS=$(grep "/tcp" "$PORTSCAN_FILE" | grep "open" | cut -d/ -f1 || true)
 
   if [[ -z "$PORTS" ]]; then
@@ -61,21 +71,18 @@ while read -r host; do
   echo "[*] [$CURRENT/$TOTAL_HOSTS] Grabbing banners from $host"
 
   for port in $PORTS; do
-    # Validate port number
-    if ! [[ "$port" =~ ^[0-9]+$ ]]; then
-      continue
-    fi
+    [[ ! "$port" =~ ^[0-9]+$ ]] && continue
 
     BANNER_FILE="$LOG_DIR/banner_${host}_${port}_$SCAN_ID.txt"
 
-    # Skip if banner already exists (resume-safe)
-    if [[ -f "$BANNER_FILE" ]]; then
+    # Resume-safe skip
+    if [[ "$RESUME_MODE" == "true" && -f "$BANNER_FILE" ]]; then
       continue
     fi
 
     echo "[*]   → $host:$port"
 
-    # Grab banner safely (NON-FATAL)
+    # Banner grab (NON-FATAL by design)
     {
       echo "=== $host:$port ==="
       timeout 5s bash -c \
@@ -86,5 +93,8 @@ while read -r host; do
   done
 
 done < "$HOST_FILE"
+
+# Mark stage as done
+mark_done banner_grab
 
 echo "[+] Banner grabbing completed"

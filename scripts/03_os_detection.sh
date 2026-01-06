@@ -1,14 +1,24 @@
 #!/bin/bash
-
 set -euo pipefail
 
 source ../config.env
 source ../.runtime.env
+source ./_helpers.sh
+
+# -------------------------------
+# Resume mode (safe default)
+# -------------------------------
+RESUME_MODE="${RESUME_MODE:-false}"
+
+PROGRESS_FILE="$OUTPUT_DIR/.progress/state"
 
 HOST_FILE="$OUTPUT_DIR/logs/live_hosts_$SCAN_ID.txt"
 RAW_DIR="$OUTPUT_DIR/raw"
 
 echo "[*] Starting OS detection"
+
+# Mark stage as running
+mark_running os_detection
 
 # -------------------------------
 # Privilege check (MANDATORY)
@@ -43,10 +53,9 @@ CURRENT=0
 while read -r host; do
   CURRENT=$((CURRENT + 1))
 
-  # Skip empty lines
   [[ -z "$host" ]] && continue
 
-  # Basic IPv4 sanity check
+  # IPv4 sanity check
   if ! [[ "$host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     echo "[!] Skipping invalid host entry: $host"
     continue
@@ -54,15 +63,14 @@ while read -r host; do
 
   OUTPUT_PREFIX="$RAW_DIR/os_${host}_$SCAN_ID"
 
-  # Skip if OS scan already exists
-  if [[ -f "${OUTPUT_PREFIX}.nmap" ]]; then
-    echo "[*] [$CURRENT/$TOTAL_HOSTS] OS scan already exists for $host — skipping"
+  # Resume-safe skip
+  if [[ "$RESUME_MODE" == "true" && -f "${OUTPUT_PREFIX}.nmap" ]]; then
+    echo "[*] [$CURRENT/$TOTAL_HOSTS] Skipping $host (OS scan already exists)"
     continue
   fi
 
   echo "[*] [$CURRENT/$TOTAL_HOSTS] Detecting OS for $host"
 
-  # Run OS detection with safety limits
   if ! timeout 10m nmap \
       -O \
       --osscan-guess \
@@ -76,5 +84,8 @@ while read -r host; do
   fi
 
 done < "$HOST_FILE"
+
+# Mark stage as completed
+mark_done os_detection
 
 echo "[+] OS detection completed"
